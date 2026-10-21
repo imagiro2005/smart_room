@@ -1,0 +1,8 @@
+[wokwi]
+version = 1
+firmware = ".pio/build/real/firmware.bin"
+elf = ".pio/build/real/firmware.elf"
+
+[[chip]]
+name = "light_sensor"
+binary = "chips/light_sensor.chip.wasm"

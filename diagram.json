@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "author": "SmartRoom ESP32-C3",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-c3-devkitm-1", "id": "esp", "top": 40, "left": 40, "attrs": {} },
+    { "type": "wokwi-potentiometer", "id": "pot", "top": -140, "left": -120, "attrs": {} },
+    { "type": "wokwi-dht22", "id": "dht", "top": -140, "left": 100, "attrs": { "temperature": "28", "humidity": "65" } },
+    { "type": "wokwi-pir-motion-sensor", "id": "pir", "top": -140, "left": 300, "attrs": {} },
+    { "type": "chip-light_sensor", "id": "light_sensor", "top": 300, "left": -120, "attrs": { "lux": "150" } },
+    { "type": "wokwi-ssd1306", "id": "oled", "top": 300, "left": 120, "attrs": {} },
+    { "type": "wokwi-resistor", "id": "r1", "top": 70, "left": 280, "attrs": { "value": "220" } },
+    { "type": "wokwi-led", "id": "led_room", "top": 120, "left": 280, "attrs": { "color": "green", "label": "Đèn phòng (GPIO 7)" } },
+    { "type": "wokwi-resistor", "id": "r2", "top": 70, "left": 370, "attrs": { "value": "220" } },
+    { "type": "wokwi-led", "id": "led_warn", "top": 120, "left": 370, "attrs": { "color": "red", "label": "Cảnh báo (GPIO 10)" } }
+  ],
+  "connections": [
+    [ "pot:VCC", "esp:3V3.1", "red", [ "v0" ] ],
+    [ "pot:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "pot:SIG", "esp:3", "orange", [ "v0" ] ],
+
+    [ "dht:VCC", "esp:3V3.1", "red", [ "v0" ] ],
+    [ "dht:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "dht:SDA", "esp:6", "blue", [ "v0" ] ],
+
+    [ "pir:VCC", "esp:3V3.1", "red", [ "v0" ] ],
+    [ "pir:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "pir:OUT", "esp:0", "purple", [ "v0" ] ],
+
+    [ "light_sensor:VCC", "esp:3V3.1", "red", [ "v0" ] ],
+    [ "light_sensor:GND", "esp:GND.2", "black", [ "v0" ] ],
+    [ "light_sensor:SDA", "esp:4", "green", [ "v0" ] ],
+    [ "light_sensor:SCL", "esp:5", "yellow", [ "v0" ] ],
+
+    [ "oled:3V3", "esp:3V3.1", "red", [ "v0" ] ],
+    [ "oled:GND", "esp:GND.2", "black", [ "v0" ] ],
+    [ "oled:DATA", "esp:4", "green", [ "v0" ] ],
+    [ "oled:CLK", "esp:5", "yellow", [ "v0" ] ],
+
+    [ "esp:7", "r1:1", "green", [ "v0" ] ],
+    [ "r1:2", "led_room:A", "green", [ "v0" ] ],
+    [ "led_room:C", "esp:GND.2", "black", [ "v0" ] ],
+
+    [ "esp:10", "r2:1", "red", [ "v0" ] ],
+    [ "r2:2", "led_warn:A", "red", [ "v0" ] ],
+    [ "led_warn:C", "esp:GND.2", "black", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}

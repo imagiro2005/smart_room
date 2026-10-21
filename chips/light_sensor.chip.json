@@ -1,0 +1,22 @@
+{
+  "name": "light_sensor",
+  "author": "SmartRoom",
+  "pins": [
+    "VCC",
+    "GND",
+    "SCL",
+    "SDA",
+    "ADDR"
+  ],
+  "controls": [
+    {
+      "id": "lux",
+      "type": "range",
+      "label": "Light (Lux)",
+      "min": 0,
+      "max": 1000,
+      "step": 1,
+      "value": 150
+    }
+  ]
+}

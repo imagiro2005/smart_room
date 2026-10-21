@@ -1,0 +1,17 @@
+# PlatformIO build artifacts & local cache
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# VS Code settings (tránh đẩy cấu hình IDE cá nhân)
+.vscode/
+
+# Build and temporary files
+*.pyc
+*.tmp
+*.bak
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
