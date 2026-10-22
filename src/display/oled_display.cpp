@@ -11,41 +11,41 @@ String OledDisplay::formatValue(float value, int decimals) {
 }
 
 void OledDisplay::init(RoomState& state) {
-    _oled.setI2CAddress(ADDR_OLED * 2);
+    _oled.setI2CAddress(I2C_ADDR_OLED * 2);
     _oled.begin();
-    state.oledOK = true;
+    state.isOledReady = true;
     update(state);
 }
 
 void OledDisplay::update(const RoomState& state) {
-    if (!state.oledOK) {
+    if (!state.isOledReady) {
         return;
     }
 
     _oled.clearBuffer();
-    // Font 7x14 to rõ, dễ nhìn, cân đối trên màn hình 128x64
+    // 7x14 font: clear, modern and balanced on 128x64 display
     _oled.setFont(u8g2_font_7x14_tf);
 
-    // Dòng 1: Nhiệt độ
-    String sTemp = "TEMP  : " + formatValue(state.nhietDo) + " C";
+    // Line 1: Temperature
+    String sTemp = "TEMP  : " + formatValue(state.temperature) + " C";
     _oled.drawStr(2, 14, sTemp.c_str());
 
-    // Dòng 2: Độ ẩm
-    String sHum = "HUM   : " + formatValue(state.doAm) + " %";
+    // Line 2: Humidity
+    String sHum = "HUM   : " + formatValue(state.humidity) + " %";
     _oled.drawStr(2, 30, sHum.c_str());
 
-    // Dòng 3: Ánh sáng
-    String sLux = "LUX   : " + formatValue(state.doSang, 0) + " lx";
+    // Line 3: Ambient Light
+    String sLux = "LUX   : " + formatValue(state.lightLux, 0) + " lx";
     _oled.drawStr(2, 46, sLux.c_str());
 
-    // Dòng 4: Phát hiện người
-    String sMotion;
-    if (!state.pirSanSang) {
-        sMotion = "PERSON: INIT...";
+    // Line 4: Real-time Clock from RTC DS1307
+    String sTime;
+    if (state.isRtcReady) {
+        sTime = "TIME  : " + state.getTimeString();
     } else {
-        sMotion = state.coChuyenDong ? "PERSON: YES" : "PERSON: NO";
+        sTime = "TIME  : NO RTC";
     }
-    _oled.drawStr(2, 62, sMotion.c_str());
+    _oled.drawStr(2, 62, sTime.c_str());
 
     _oled.sendBuffer();
 }

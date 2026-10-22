@@ -7,14 +7,14 @@
 #include "display/oled_display.h"
 #include "network/network_manager.h"
 
-// Đối tượng trạng thái & các module
+// System state & module instances
 RoomState      roomState;
 SensorManager  sensorMgr;
 RoomController roomCtrl;
 OledDisplay    oledDisp;
 NetworkManager netMgr;
 
-// Hàm đồng bộ tất cả đầu ra (LEDs, OLED, BLE, Serial)
+// Synchronize all hardware outputs (3 LEDs, OLED, BLE, Serial)
 void updateAllOutputs() {
     roomCtrl.update(roomState);
     oledDisp.update(roomState);
@@ -23,13 +23,13 @@ void updateAllOutputs() {
 
 void setup() {
     Serial.begin(115200);
-    roomState.lucBatDau = millis();
+    roomState.bootTimeMs = millis();
 
-    // 1. Khởi tạo bus I2C chung trước cho OLED và Cảm biến ánh sáng
+    // 1. Initialize shared I2C bus before peripherals (BH1750, OLED, RTC DS1307)
     Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
     Wire.setTimeOut(25);
 
-    // 2. Khởi tạo các module
+    // 2. Initialize all modules
     roomCtrl.init();
     oledDisp.init(roomState);
     sensorMgr.init(roomState);
@@ -39,46 +39,41 @@ void setup() {
 }
 
 void loop() {
-    bool canDoc = false;
-    bool canCapNhat = false;
+    bool shouldSample = false;
+    bool shouldRefreshDisplay = false;
 
-    // 1. Kiểm tra cờ ngắt từ Timer và PIR
-    sensorMgr.checkInterruptFlags(canDoc, canCapNhat);
+    // 1. Check hardware interrupt flags (Timer alarm & RTC 1Hz square wave)
+    sensorMgr.checkInterruptFlags(shouldSample, shouldRefreshDisplay);
 
-    // 2. Kiểm tra PIR đã qua thời gian ổn định chưa (60s mặc định)
-    if (!roomState.pirSanSang && (millis() - roomState.lucBatDau >= PIR_WARMUP_MS)) {
-        roomState.pirSanSang = true;
-        canCapNhat = true;
+    // 2. Check physical wall push button event (External Interrupt)
+    if (sensorMgr.checkButtonPress()) {
+        roomCtrl.handleButtonPress(roomState);
+        shouldRefreshDisplay = true;
     }
 
-    // 3. Nếu PIR có thay đổi hoặc vừa ổn định -> cập nhật trạng thái chuyển động
-    if (canCapNhat) {
-        sensorMgr.updateMotionState(roomState);
-    }
-
-    // 4. Kiểm tra lệnh điều khiển từ UART ('A', '1', '0')
+    // 3. Process UART commands ('A' = Auto, '1' = Lamp ON, '0' = Lamp OFF)
     if (roomCtrl.processSerial(roomState)) {
-        canCapNhat = true;
+        shouldRefreshDisplay = true;
     }
 
-    // 5. Dự phòng nếu phần cứng timer không khả dụng
-    if (!roomState.timerOK && (millis() - roomState.mauMs >= CHU_KY_DOC_MS)) {
-        canDoc = true;
+    // 4. Timer fallback in case hardware timer fails
+    if (!roomState.isTimerReady && (millis() - roomState.sampleTimeMs >= SENSOR_SAMPLE_INTERVAL_MS)) {
+        shouldSample = true;
     }
 
-    // 6. Đọc cảm biến định kỳ (mỗi 2 giây)
-    if (canDoc) {
+    // 5. Periodic sensor sampling & RTC time update
+    if (shouldSample) {
         sensorMgr.readSensors(roomState);
-        canCapNhat = true;
+        shouldRefreshDisplay = true;
     }
 
-    // 7. Cập nhật đầu ra khi có thay đổi trạng thái
-    if (canCapNhat) {
+    // 6. Update system outputs if state changed
+    if (shouldRefreshDisplay) {
         updateAllOutputs();
     }
 
-    // 8. Phục vụ WebServer và duy trì BLE Advertising
+    // 7. Handle WebServer HTTP requests & maintain BLE advertising
     netMgr.handleClients();
 
-    delay(1); // Nhường CPU cho WiFi/BLE background tasks
+    delay(1); // Yield CPU to FreeRTOS background tasks (WiFi/BLE)
 }

@@ -4,15 +4,23 @@
   "editor": "wokwi",
   "parts": [
     { "type": "board-esp32-c3-devkitm-1", "id": "esp", "top": 40, "left": 40, "attrs": {} },
-    { "type": "wokwi-potentiometer", "id": "pot", "top": -140, "left": -120, "attrs": {} },
-    { "type": "wokwi-dht22", "id": "dht", "top": -140, "left": 100, "attrs": { "temperature": "28", "humidity": "65" } },
-    { "type": "wokwi-pir-motion-sensor", "id": "pir", "top": -140, "left": 300, "attrs": {} },
-    { "type": "chip-light_sensor", "id": "light_sensor", "top": 300, "left": -120, "attrs": { "lux": "150" } },
-    { "type": "wokwi-ssd1306", "id": "oled", "top": 300, "left": 120, "attrs": {} },
-    { "type": "wokwi-resistor", "id": "r1", "top": 70, "left": 280, "attrs": { "value": "220" } },
-    { "type": "wokwi-led", "id": "led_room", "top": 120, "left": 280, "attrs": { "color": "green", "label": "Đèn phòng (GPIO 7)" } },
-    { "type": "wokwi-resistor", "id": "r2", "top": 70, "left": 370, "attrs": { "value": "220" } },
-    { "type": "wokwi-led", "id": "led_warn", "top": 120, "left": 370, "attrs": { "color": "red", "label": "Cảnh báo (GPIO 10)" } }
+    { "type": "wokwi-potentiometer", "id": "pot", "top": -140, "left": -140, "attrs": {} },
+    { "type": "wokwi-dht22", "id": "dht", "top": -140, "left": 60, "attrs": { "temperature": "25", "humidity": "55" } },
+    { "type": "wokwi-ds1307", "id": "rtc", "top": -140, "left": 260, "attrs": {} },
+
+    { "type": "wokwi-pushbutton", "id": "btn", "top": -40, "left": -140, "attrs": { "color": "blue", "label": "Công tắc phòng (GPIO 2)" } },
+
+    { "type": "chip-light_sensor", "id": "light_sensor", "top": 300, "left": -140, "attrs": { "lux": "250" } },
+    { "type": "wokwi-ssd1306", "id": "oled", "top": 300, "left": 100, "attrs": {} },
+
+    { "type": "wokwi-resistor", "id": "r1", "top": 50, "left": 280, "attrs": { "value": "220" } },
+    { "type": "wokwi-led", "id": "led_green", "top": 90, "left": 280, "attrs": { "color": "green", "label": "MT Dễ chịu (GPIO 7)" } },
+
+    { "type": "wokwi-resistor", "id": "r2", "top": 50, "left": 360, "attrs": { "value": "220" } },
+    { "type": "wokwi-led", "id": "led_red", "top": 90, "left": 360, "attrs": { "color": "red", "label": "Vượt ngưỡng (GPIO 10)" } },
+
+    { "type": "wokwi-resistor", "id": "r3", "top": 150, "left": 320, "attrs": { "value": "220" } },
+    { "type": "wokwi-led", "id": "led_white", "top": 190, "left": 320, "attrs": { "color": "white", "label": "Đèn phòng (GPIO 1)" } }
   ],
   "connections": [
     [ "pot:VCC", "esp:3V3.1", "red", [ "v0" ] ],
@@ -23,9 +31,14 @@
     [ "dht:GND", "esp:GND.1", "black", [ "v0" ] ],
     [ "dht:SDA", "esp:6", "blue", [ "v0" ] ],
 
-    [ "pir:VCC", "esp:3V3.1", "red", [ "v0" ] ],
-    [ "pir:GND", "esp:GND.1", "black", [ "v0" ] ],
-    [ "pir:OUT", "esp:0", "purple", [ "v0" ] ],
+    [ "rtc:5V", "esp:5V.1", "red", [ "v0" ] ],
+    [ "rtc:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "rtc:SDA", "esp:4", "green", [ "v0" ] ],
+    [ "rtc:SCL", "esp:5", "yellow", [ "v0" ] ],
+    [ "rtc:SQW", "esp:0", "purple", [ "v0" ] ],
+
+    [ "btn:1.l", "esp:2", "blue", [ "v0" ] ],
+    [ "btn:2.l", "esp:GND.1", "black", [ "v0" ] ],
 
     [ "light_sensor:VCC", "esp:3V3.1", "red", [ "v0" ] ],
     [ "light_sensor:GND", "esp:GND.2", "black", [ "v0" ] ],
@@ -38,12 +51,16 @@
     [ "oled:CLK", "esp:5", "yellow", [ "v0" ] ],
 
     [ "esp:7", "r1:1", "green", [ "v0" ] ],
-    [ "r1:2", "led_room:A", "green", [ "v0" ] ],
-    [ "led_room:C", "esp:GND.2", "black", [ "v0" ] ],
+    [ "r1:2", "led_green:A", "green", [ "v0" ] ],
+    [ "led_green:C", "esp:GND.2", "black", [ "v0" ] ],
 
     [ "esp:10", "r2:1", "red", [ "v0" ] ],
-    [ "r2:2", "led_warn:A", "red", [ "v0" ] ],
-    [ "led_warn:C", "esp:GND.2", "black", [ "v0" ] ]
+    [ "r2:2", "led_red:A", "red", [ "v0" ] ],
+    [ "led_red:C", "esp:GND.2", "black", [ "v0" ] ],
+
+    [ "esp:1", "r3:1", "white", [ "v0" ] ],
+    [ "r3:2", "led_white:A", "white", [ "v0" ] ],
+    [ "led_white:C", "esp:GND.2", "black", [ "v0" ] ]
   ],
   "dependencies": {}
 }

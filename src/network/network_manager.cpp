@@ -21,29 +21,33 @@ void NetworkManager::handleApiStatus() {
     if (!_statePtr) return;
     const RoomState& state = *_statePtr;
 
-    int soMayBLE = _bleServer ? _bleServer->getConnectedCount() : 0;
+    int bleClientCount = _bleServer ? _bleServer->getConnectedCount() : 0;
 
     String json;
-    json.reserve(560);
-    json = "{\"t\":" + formatJsonNumber(state.nhietDo);
-    json += ",\"h\":" + formatJsonNumber(state.doAm);
-    json += ",\"lux\":" + formatJsonNumber(state.doSang);
-    json += ",\"threshold\":" + String(state.nguongToi, 1);
-    json += ",\"adc\":" + String(state.giaTriADC);
-    json += ",\"pir\":" + String(state.coChuyenDong ? 1 : 0);
-    json += ",\"lamp\":" + String(state.denBat ? 1 : 0);
-    json += ",\"alert\":" + String(state.canhBao ? 1 : 0);
-    json += ",\"dark\":" + String(state.phongToi ? 1 : 0);
-    json += ",\"mode\":" + String(static_cast<int>(state.cheDo));
-    json += ",\"ready\":" + String(state.daCoDuLieu ? 1 : 0);
-    json += ",\"pirReady\":" + String(state.pirSanSang ? 1 : 0);
-    json += ",\"timer\":" + String(state.timerOK ? 1 : 0);
-    json += ",\"oled\":" + String(state.oledOK ? 1 : 0);
-    json += ",\"bleClients\":" + String(soMayBLE);
-    json += ",\"tMax\":" + String(NGUONG_NHIET_CAO, 1);
-    json += ",\"hMax\":" + String(NGUONG_AM_CAO, 1);
-    json += ",\"uptime\":" + String(millis() / 1000);
-    json += ",\"sampleMs\":" + String(state.mauMs) + "}";
+    json.reserve(580);
+    json = "{\"temperature\":" + formatJsonNumber(state.temperature);
+    json += ",\"humidity\":" + formatJsonNumber(state.humidity);
+    json += ",\"lightLux\":" + formatJsonNumber(state.lightLux);
+    json += ",\"luxThreshold\":" + String(state.luxThreshold, 1);
+    json += ",\"potAdcValue\":" + String(state.potAdcValue);
+    json += ",\"time\":\"" + state.getTimeString() + "\"";
+    json += ",\"date\":\"" + state.getDateString() + "\"";
+    json += ",\"isComfortable\":" + String(state.isComfortable ? 1 : 0);
+    json += ",\"greenLed\":" + String(state.isComfortable ? 1 : 0);
+    json += ",\"redLed\":" + String(state.isComfortable ? 0 : 1);
+    json += ",\"isWhiteLampOn\":" + String(state.isWhiteLampOn ? 1 : 0);
+    json += ",\"isNight\":" + String(state.isNight ? 1 : 0);
+    json += ",\"isDayTooDark\":" + String(state.isDayTooDark ? 1 : 0);
+    json += ",\"isDayTooBright\":" + String(state.isDayTooBright ? 1 : 0);
+    json += ",\"isNightTooBright\":" + String(state.isNightTooBright ? 1 : 0);
+    json += ",\"mode\":" + String(static_cast<int>(state.mode));
+    json += ",\"isDataReady\":" + String(state.isDataReady ? 1 : 0);
+    json += ",\"isRtcReady\":" + String(state.isRtcReady ? 1 : 0);
+    json += ",\"isTimerReady\":" + String(state.isTimerReady ? 1 : 0);
+    json += ",\"isOledReady\":" + String(state.isOledReady ? 1 : 0);
+    json += ",\"bleClients\":" + String(bleClientCount);
+    json += ",\"uptimeSec\":" + String(millis() / 1000);
+    json += ",\"sampleTimeMs\":" + String(state.sampleTimeMs) + "}";
 
     _server.sendHeader("Cache-Control", "no-store");
     _server.send(200, "application/json", json);
@@ -54,11 +58,11 @@ void NetworkManager::handleApiMode() {
 
     String modeArg = _server.arg("mode");
     if (modeArg != "0" && modeArg != "1" && modeArg != "2") {
-        _server.send(400, "application/json", "{\"error\":\"mode\"}");
+        _server.send(400, "application/json", "{\"error\":\"invalid_mode\"}");
         return;
     }
 
-    _statePtr->cheDo = static_cast<RoomMode>(modeArg.toInt());
+    _statePtr->mode = static_cast<RoomMode>(modeArg.toInt());
 
     if (_onModeChanged) {
         _onModeChanged();
@@ -72,14 +76,14 @@ void NetworkManager::initBLE() {
     _bleServer = BLEDevice::createServer();
     _bleServer->setCallbacks(new BleServerCallbacks());
 
-    BLEService* dichVu = _bleServer->createService(BLE_SERVICE_UUID);
-    _bleDataChar = dichVu->createCharacteristic(
+    BLEService* service = _bleServer->createService(BLE_SERVICE_UUID);
+    _bleDataChar = service->createCharacteristic(
         BLE_DATA_UUID,
         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
     );
     _bleDataChar->addDescriptor(new BLE2902());
-    _bleDataChar->setValue("CHO DU LIEU");
-    dichVu->start();
+    _bleDataChar->setValue("WAITING DATA");
+    service->start();
 
     BLEAdvertising* adv = BLEDevice::getAdvertising();
     adv->addServiceUUID(BLE_SERVICE_UUID);
@@ -91,12 +95,12 @@ void NetworkManager::init(RoomState& state, UpdateCallback onModeChanged) {
     _statePtr = &state;
     _onModeChanged = onModeChanged;
 
-    // 1. Khởi tạo WiFi SoftAP
+    // 1. Initialize WiFi SoftAP
     WiFi.mode(WIFI_AP);
     _wifiOK = WiFi.softAP(WIFI_SSID, WIFI_PASSWORD);
 
     if (_wifiOK) {
-        Serial.printf("[Network] Wi-Fi: %s | Pass: %s | URL: http://%s\n",
+        Serial.printf("[Network] Wi-Fi AP: %s | Pass: %s | URL: http://%s\r\n",
                       WIFI_SSID, WIFI_PASSWORD, WiFi.softAPIP().toString().c_str());
 
         _server.on("/", HTTP_GET, [this]() { handleRoot(); });
@@ -104,12 +108,12 @@ void NetworkManager::init(RoomState& state, UpdateCallback onModeChanged) {
         _server.on("/api/mode", HTTP_POST, [this]() { handleApiMode(); });
         _server.begin();
     } else {
-        Serial.println("[Network] LOI KHOI TAO WIFI SOFTAP!");
+        Serial.println("[Network] ERROR: SoftAP initialization failed!");
     }
 
-    // 2. Khởi tạo BLE
+    // 2. Initialize BLE
     initBLE();
-    Serial.println("[Network] BLE da khoi dong. UART dieu khien: A=AUTO, 1=ON, 0=OFF");
+    Serial.println("[Network] BLE initialized. UART control: A=AUTO, 1=ON, 0=OFF");
 }
 
 void NetworkManager::handleClients() {
@@ -122,36 +126,52 @@ void NetworkManager::handleClients() {
 }
 
 void NetworkManager::sendTelemetry(const RoomState& state) {
-    int nhietGui = isnan(state.nhietDo) ? -99 : static_cast<int>(round(state.nhietDo));
-    int amGui    = isnan(state.doAm)    ? -1  : static_cast<int>(round(state.doAm));
-    int sangGui  = isnan(state.doSang)  ? -1  : static_cast<int>(round(state.doSang));
+    int tVal   = isnan(state.temperature) ? -99 : static_cast<int>(round(state.temperature));
+    int hVal   = isnan(state.humidity)    ? -1  : static_cast<int>(round(state.humidity));
+    int luxVal = isnan(state.lightLux)    ? -1  : static_cast<int>(round(state.lightLux));
 
-    // 1. Dữ liệu gọn nhẹ gửi qua BLE GATT Notify (tối đa 20 byte)
-    char text[24];
-    snprintf(text, sizeof(text), "%d,%d,%d,%d,%d,%d",
-             nhietGui, amGui, sangGui,
-             static_cast<int>(state.coChuyenDong),
-             static_cast<int>(state.denBat),
-             static_cast<int>(state.canhBao));
+    // 1. Compact payload for BLE GATT Notify (under 20 bytes)
+    char bleText[28];
+    snprintf(bleText, sizeof(bleText), "%d,%d,%d,%d,%d,%d",
+             tVal, hVal, luxVal,
+             static_cast<int>(state.isComfortable),
+             static_cast<int>(state.isWhiteLampOn),
+             static_cast<int>(state.isNight));
 
     if (_bleDataChar && _bleServer) {
-        _bleDataChar->setValue(text);
+        _bleDataChar->setValue(bleText);
         if (_bleServer->getConnectedCount() > 0) {
             _bleDataChar->notify();
         }
     }
 
-    // 2. In Serial trực quan, định dạng căn lề bảng thẳng tắp, dùng \r\n chống thụt dòng
-    String sTemp = isnan(state.nhietDo) ? "--" : String(state.nhietDo, 1);
-    String sHum  = isnan(state.doAm)    ? "--" : String(state.doAm, 1);
-    String sLux  = isnan(state.doSang)  ? "--" : String(state.doSang, 0);
+    // 2. Clear, tabular, aligned Serial logging with CRLF (\r\n)
+    String sTemp = isnan(state.temperature) ? "--" : String(state.temperature, 1);
+    String sHum  = isnan(state.humidity)    ? "--" : String(state.humidity, 1);
+    String sLux  = isnan(state.lightLux)    ? "--" : String(state.lightLux, 0);
 
-    Serial.printf("[ROOM] Mode: %-4s | Temp: %5s C | Hum: %5s %% | Lux: %4s lx | Person: %-3s | Lamp: %-3s | Alert: %-3s\r\n",
+    const char* sComfort = state.isComfortable ? "YES [GREEN]" : "ALERT [RED]";
+    const char* sPeriod  = state.isNight ? "NIGHT" : "DAY";
+
+    // Extra status note for white lamp shutoff/activation
+    const char* sLampReason = "";
+    if (state.isWhiteLampOn) {
+        if (!state.isNight && state.isDayTooDark) sLampReason = "(Day Dark Comp.)";
+        else if (state.isNight) sLampReason = "(Night Auto)";
+        else sLampReason = "(Manual)";
+    } else {
+        if (!state.isNight && state.isDayTooBright) sLampReason = "(Day Overbright OFF)";
+        else if (state.isNight && state.isNightTooBright) sLampReason = "(Night Bright OFF)";
+    }
+
+    Serial.printf("[ROOM %s | %-4s] Temp: %5s C | Hum: %5s %% | Lux: %4s lx (%-5s) | Comfort: %-13s | Lamp: %-3s %s\r\n",
+                  state.getTimeString().c_str(),
                   state.getModeName(),
                   sTemp.c_str(),
                   sHum.c_str(),
                   sLux.c_str(),
-                  state.coChuyenDong ? "YES" : "NO",
-                  state.denBat ? "ON" : "OFF",
-                  state.canhBao ? "YES" : "NO");
+                  sPeriod,
+                  sComfort,
+                  state.isWhiteLampOn ? "ON" : "OFF",
+                  sLampReason);
 }
