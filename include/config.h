@@ -5,70 +5,53 @@
 // ==========================================
 // GPIO PIN CONFIGURATION (ESP32-C3 DevKit)
 // ==========================================
-constexpr int PIN_POT_ADC       = 3;   // Potentiometer for threshold adjustment (ADC1_CH3)
-constexpr int PIN_DHT_DATA      = 6;   // DHT sensor data line
-constexpr int PIN_PUSH_BUTTON   = 2;   // Physical wall button (External Interrupt, active LOW)
-constexpr int PIN_RTC_SQW       = 0;   // RTC DS1307 1Hz square wave (External Interrupt)
-constexpr int PIN_LED_GREEN     = 7;   // Green LED: Comfortable environment indicator
-constexpr int PIN_LED_RED       = 10;  // Red LED: Environment threshold violation / Alert
-constexpr int PIN_LED_WHITE     = 1;   // White LED: Main room lighting lamp
-constexpr int PIN_I2C_SDA       = 4;   // Shared I2C bus SDA (BH1750, OLED, RTC DS1307)
+constexpr int PIN_POT_ADC       = 3;   // Potentiometer: Threshold adjustment (ADC1_CH3)
+constexpr int PIN_LDR_ADC       = 1;   // LDR Photoresistor: Light intensity (ADC1_CH1)
+constexpr int PIN_PIR_MOTION    = 0;   // PIR Sensor: Motion detection (External Interrupt)
+constexpr int PIN_DHT_DATA      = 6;   // DHT22 Sensor: Temperature & Humidity
+constexpr int PIN_LED_GREEN     = 7;   // Green LED: Safe / Comfortable environment
+constexpr int PIN_LED_RED       = 10;  // Red LED: Threshold violated / Hazard alert
+constexpr int PIN_LED_WHITE     = 2;   // White LED: Main room lighting lamp
+constexpr int PIN_I2C_SDA       = 4;   // Shared I2C bus SDA (OLED SSD1306)
 constexpr int PIN_I2C_SCL       = 5;   // Shared I2C bus SCL
 
-// DHT Sensor Type
+// Sensor Type
 #define SENSOR_DHT_TYPE DHT22
 
 // ==========================================
-// I2C DEVICE ADDRESSES
+// I2C DEVICE ADDRESS
 // ==========================================
 constexpr uint8_t I2C_ADDR_OLED = 0x3C;
-constexpr uint8_t I2C_ADDR_BH   = 0x23;
-constexpr uint8_t I2C_ADDR_RTC  = 0x68;
 
 // ==========================================
-// COMFORTABLE ENVIRONMENT THRESHOLDS
+// SAFE ENVIRONMENT THRESHOLDS (DHT22)
 // ==========================================
-constexpr float TEMP_COMFORT_MIN = 20.0f; // Comfortable temperature: 20°C - 28°C
-constexpr float TEMP_COMFORT_MAX = 28.0f;
+constexpr float TEMP_SAFE_MIN = 18.0f; // Safe temperature range: 18°C - 30°C
+constexpr float TEMP_SAFE_MAX = 30.0f;
 
-constexpr float HUM_COMFORT_MIN  = 40.0f; // Comfortable humidity: 40% - 70%
-constexpr float HUM_COMFORT_MAX  = 70.0f;
-
-// Daytime comfortable lighting (06:00 - 17:59): Sufficient light for working/studying
-constexpr float LUX_DAY_COMFORT_MIN = 150.0f;
-constexpr float LUX_DAY_COMFORT_MAX = 1000.0f;
-
-// Nighttime comfortable lighting (18:00 - 05:59): Soft ambient light for resting
-constexpr float LUX_NIGHT_COMFORT_MIN = 20.0f;
-constexpr float LUX_NIGHT_COMFORT_MAX = 300.0f;
+constexpr float HUM_SAFE_MIN  = 40.0f; // Safe humidity range: 40% - 75%
+constexpr float HUM_SAFE_MAX  = 75.0f;
 
 // ==========================================
-// AUTOMATIC LIGHTING LOGIC THRESHOLDS
+// SMART LIGHTING TIMING & HYSTERESIS
 // ==========================================
-// Daytime dark compensation (rainy, cloudy, curtains closed)
-constexpr float LUX_DAY_DARK_ON       = 120.0f; // Below 120 lux -> Turn ON white lamp
-constexpr float LUX_DAY_DARK_OFF      = 160.0f; // Recovered above 160 lux -> Turn OFF white lamp
+// Off-delay timer: Keep room lamp on for 30 seconds after the last detected motion
+constexpr uint32_t LAMP_OFF_DELAY_MS = 30000; 
 
-// Daytime excessive brightness safety shutoff:
-// If daytime ambient light is extremely bright (> 800 lux), turn OFF white lamp immediately
-constexpr float LUX_DAY_OVER_BRIGHT   = 800.0f;
+// Initial PIR sensor warm-up stabilization delay (15 seconds)
+constexpr uint32_t PIR_WARMUP_MS = 15000;
 
-// Nighttime excessive brightness shutoff
-constexpr float LUX_NIGHT_BRIGHT_OFF  = 350.0f; // Above 350 lux at night -> Turn OFF lamp
-constexpr float LUX_NIGHT_BRIGHT_ON   = 280.0f; // Ambient dim below 280 lux -> Turn ON lamp
+// Sensor sampling interval via Hardware Timer (2 seconds)
+constexpr uint32_t SENSOR_SAMPLE_INTERVAL_MS = 2000;
 
-// RTC Day / Night transition boundaries
-constexpr uint8_t NIGHT_START_HOUR = 18; // 18:00 (Night begins)
-constexpr uint8_t NIGHT_END_HOUR   = 6;  // 06:00 (Day begins)
-
-// Sampling Interval
-constexpr uint32_t SENSOR_SAMPLE_INTERVAL_MS = 2000; // Sample every 2000 ms
+// Light hysteresis (percentage) to prevent rapid flickering
+constexpr float LIGHT_HYSTERESIS_PERCENT = 3.0f;
 
 // ==========================================
 // ROOM LIGHTING CONTROL MODES
 // ==========================================
 enum RoomMode {
-    MODE_AUTO       = 0, // Automated schedule & extreme lighting response
+    MODE_AUTO       = 0, // Auto on when dark AND motion detected (with off-delay)
     MODE_MANUAL_ON  = 1, // Manually forced ON
     MODE_MANUAL_OFF = 2  // Manually forced OFF
 };

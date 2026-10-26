@@ -25,7 +25,7 @@ void setup() {
     Serial.begin(115200);
     roomState.bootTimeMs = millis();
 
-    // 1. Initialize shared I2C bus before peripherals (BH1750, OLED, RTC DS1307)
+    // 1. Initialize shared I2C bus for OLED SSD1306
     Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
     Wire.setTimeOut(25);
 
@@ -40,39 +40,44 @@ void setup() {
 
 void loop() {
     bool shouldSample = false;
-    bool shouldRefreshDisplay = false;
+    bool shouldUpdateState = false;
 
-    // 1. Check hardware interrupt flags (Timer alarm & RTC 1Hz square wave)
-    sensorMgr.checkInterruptFlags(shouldSample, shouldRefreshDisplay);
+    // 1. Check hardware interrupt flags (Timer alarm & PIR motion interrupt)
+    sensorMgr.checkInterruptFlags(shouldSample, shouldUpdateState);
 
-    // 2. Check physical wall push button event (External Interrupt)
-    if (sensorMgr.checkButtonPress()) {
-        roomCtrl.handleButtonPress(roomState);
-        shouldRefreshDisplay = true;
+    // 2. Check initial PIR sensor warm-up stabilization (15 seconds)
+    if (!roomState.isPirReady && (millis() - roomState.bootTimeMs >= PIR_WARMUP_MS)) {
+        roomState.isPirReady = true;
+        shouldUpdateState = true;
     }
 
-    // 3. Process UART commands ('A' = Auto, '1' = Lamp ON, '0' = Lamp OFF)
+    // 3. Update motion state if PIR triggered or warm-up complete
+    if (shouldUpdateState) {
+        sensorMgr.updateMotionState(roomState);
+    }
+
+    // 4. Process UART serial commands ('A' = Auto, '1' = Lamp ON, '0' = Lamp OFF)
     if (roomCtrl.processSerial(roomState)) {
-        shouldRefreshDisplay = true;
+        shouldUpdateState = true;
     }
 
-    // 4. Timer fallback in case hardware timer fails
+    // 5. Timer fallback in case hardware timer fails
     if (!roomState.isTimerReady && (millis() - roomState.sampleTimeMs >= SENSOR_SAMPLE_INTERVAL_MS)) {
         shouldSample = true;
     }
 
-    // 5. Periodic sensor sampling & RTC time update
+    // 6. Periodic sensor sampling (DHT22, Potentiometer, LDR)
     if (shouldSample) {
         sensorMgr.readSensors(roomState);
-        shouldRefreshDisplay = true;
+        shouldUpdateState = true;
     }
 
-    // 6. Update system outputs if state changed
-    if (shouldRefreshDisplay) {
+    // 7. Synchronize outputs if state changed or off-delay hold window is active
+    if (shouldUpdateState || roomState.isMotionHoldActive) {
         updateAllOutputs();
     }
 
-    // 7. Handle WebServer HTTP requests & maintain BLE advertising
+    // 8. Handle WebServer HTTP requests & maintain BLE advertising
     netMgr.handleClients();
 
     delay(1); // Yield CPU to FreeRTOS background tasks (WiFi/BLE)

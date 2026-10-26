@@ -4,38 +4,34 @@
 #include "config.h"
 
 struct RoomState {
-    // Sensor readings (NAN if sensor disconnected or read error)
-    float temperature   = NAN;
-    float humidity      = NAN;
-    float lightLux      = NAN;
-    float luxThreshold  = 150.0f;
-    int   potAdcValue   = 0;
+    // Sensor readings from DHT22 (NAN if disconnected or error)
+    float temperature = NAN;
+    float humidity    = NAN;
 
-    // Real-Time Clock (RTC DS1307)
-    uint8_t  hour    = 0;
-    uint8_t  minute  = 0;
-    uint8_t  second  = 0;
-    uint8_t  day     = 1;
-    uint8_t  month   = 1;
-    uint16_t year    = 2026;
-    bool     isNight = false;
+    // ADC readings: Potentiometer (Threshold) & LDR (Light Intensity)
+    int   potRawAdc        = 0;
+    int   ldrRawAdc        = 0;
+    float thresholdPercent = 50.0f; // Adjusted via potentiometer (0% - 100%)
+    float lightPercent     = 0.0f;  // Light level from LDR (0% = Dark, 100% = Bright)
+    bool  isRoomDark       = false; // true if lightPercent <= thresholdPercent
 
-    // Environmental comfort assessment
-    bool isComfortable         = false; // true: Green LED ON, false: Red LED ON
-    bool isTempComfortable     = false;
-    bool isHumidityComfortable = false;
-    bool isLightComfortable    = false;
+    // Motion status from PIR
+    bool     isMotionDetected   = false;
+    uint32_t lastMotionTimeMs   = 0;
+    bool     isMotionHoldActive = false; // true while within the 30-second off-delay window
+
+    // Environmental safety status (DHT22)
+    bool isEnvironmentSafe = false; // true: Safe (Green LED ON), false: Alert (Red LED ON)
+    bool isTempSafe        = false;
+    bool isHumSafe         = false;
 
     // Room lighting (White LED)
-    RoomMode mode             = MODE_AUTO;
-    bool     isWhiteLampOn    = false;
-    bool     isDayTooDark     = false; // Auto ON: Daytime too dark (under 120 lux)
-    bool     isDayTooBright   = false; // Auto OFF: Daytime too bright (over 800 lux)
-    bool     isNightTooBright = false; // Auto OFF: Nighttime too bright (over 350 lux)
+    RoomMode mode          = MODE_AUTO;
+    bool     isWhiteLampOn = false;
 
     // Hardware status flags
     bool isDataReady  = false;
-    bool isRtcReady   = false;
+    bool isPirReady   = false;
     bool isOledReady  = false;
     bool isTimerReady = false;
 
@@ -49,17 +45,5 @@ struct RoomState {
             case MODE_MANUAL_OFF: return "OFF";
             default:              return "AUTO";
         }
-    }
-
-    String getTimeString() const {
-        char buf[12];
-        snprintf(buf, sizeof(buf), "%02d:%02d:%02d", hour, minute, second);
-        return String(buf);
-    }
-
-    String getDateString() const {
-        char buf[12];
-        snprintf(buf, sizeof(buf), "%02d/%02d/%04d", day, month, year);
-        return String(buf);
     }
 };

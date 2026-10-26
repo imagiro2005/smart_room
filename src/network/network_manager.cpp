@@ -27,22 +27,19 @@ void NetworkManager::handleApiStatus() {
     json.reserve(580);
     json = "{\"temperature\":" + formatJsonNumber(state.temperature);
     json += ",\"humidity\":" + formatJsonNumber(state.humidity);
-    json += ",\"lightLux\":" + formatJsonNumber(state.lightLux);
-    json += ",\"luxThreshold\":" + String(state.luxThreshold, 1);
-    json += ",\"potAdcValue\":" + String(state.potAdcValue);
-    json += ",\"time\":\"" + state.getTimeString() + "\"";
-    json += ",\"date\":\"" + state.getDateString() + "\"";
-    json += ",\"isComfortable\":" + String(state.isComfortable ? 1 : 0);
-    json += ",\"greenLed\":" + String(state.isComfortable ? 1 : 0);
-    json += ",\"redLed\":" + String(state.isComfortable ? 0 : 1);
-    json += ",\"isWhiteLampOn\":" + String(state.isWhiteLampOn ? 1 : 0);
-    json += ",\"isNight\":" + String(state.isNight ? 1 : 0);
-    json += ",\"isDayTooDark\":" + String(state.isDayTooDark ? 1 : 0);
-    json += ",\"isDayTooBright\":" + String(state.isDayTooBright ? 1 : 0);
-    json += ",\"isNightTooBright\":" + String(state.isNightTooBright ? 1 : 0);
+    json += ",\"lightPercent\":" + String(state.lightPercent, 1);
+    json += ",\"thresholdPercent\":" + String(state.thresholdPercent, 1);
+    json += ",\"potRawAdc\":" + String(state.potRawAdc);
+    json += ",\"ldrRawAdc\":" + String(state.ldrRawAdc);
+    json += ",\"isRoomDark\":" + String(state.isRoomDark ? 1 : 0);
+    json += ",\"isMotionDetected\":" + String(state.isMotionDetected ? 1 : 0);
+    json += ",\"isEnvironmentSafe\":" + String(state.isEnvironmentSafe ? 1 : 0);
+    json += ",\"greenLed\":" + String(state.isEnvironmentSafe ? 1 : 0);
+    json += ",\"redLed\":" + String(state.isEnvironmentSafe ? 0 : 1);
+    json += ",\"whiteLamp\":" + String(state.isWhiteLampOn ? 1 : 0);
     json += ",\"mode\":" + String(static_cast<int>(state.mode));
     json += ",\"isDataReady\":" + String(state.isDataReady ? 1 : 0);
-    json += ",\"isRtcReady\":" + String(state.isRtcReady ? 1 : 0);
+    json += ",\"isPirReady\":" + String(state.isPirReady ? 1 : 0);
     json += ",\"isTimerReady\":" + String(state.isTimerReady ? 1 : 0);
     json += ",\"isOledReady\":" + String(state.isOledReady ? 1 : 0);
     json += ",\"bleClients\":" + String(bleClientCount);
@@ -126,17 +123,17 @@ void NetworkManager::handleClients() {
 }
 
 void NetworkManager::sendTelemetry(const RoomState& state) {
-    int tVal   = isnan(state.temperature) ? -99 : static_cast<int>(round(state.temperature));
-    int hVal   = isnan(state.humidity)    ? -1  : static_cast<int>(round(state.humidity));
-    int luxVal = isnan(state.lightLux)    ? -1  : static_cast<int>(round(state.lightLux));
+    int tVal = isnan(state.temperature) ? -99 : static_cast<int>(round(state.temperature));
+    int hVal = isnan(state.humidity)    ? -1  : static_cast<int>(round(state.humidity));
+    int lVal = static_cast<int>(round(state.lightPercent));
 
     // 1. Compact payload for BLE GATT Notify (under 20 bytes)
     char bleText[28];
     snprintf(bleText, sizeof(bleText), "%d,%d,%d,%d,%d,%d",
-             tVal, hVal, luxVal,
-             static_cast<int>(state.isComfortable),
-             static_cast<int>(state.isWhiteLampOn),
-             static_cast<int>(state.isNight));
+             tVal, hVal, lVal,
+             static_cast<int>(state.isMotionDetected),
+             static_cast<int>(state.isEnvironmentSafe),
+             static_cast<int>(state.isWhiteLampOn));
 
     if (_bleDataChar && _bleServer) {
         _bleDataChar->setValue(bleText);
@@ -148,30 +145,18 @@ void NetworkManager::sendTelemetry(const RoomState& state) {
     // 2. Clear, tabular, aligned Serial logging with CRLF (\r\n)
     String sTemp = isnan(state.temperature) ? "--" : String(state.temperature, 1);
     String sHum  = isnan(state.humidity)    ? "--" : String(state.humidity, 1);
-    String sLux  = isnan(state.lightLux)    ? "--" : String(state.lightLux, 0);
 
-    const char* sComfort = state.isComfortable ? "YES [GREEN]" : "ALERT [RED]";
-    const char* sPeriod  = state.isNight ? "NIGHT" : "DAY";
+    const char* sEnvState = state.isEnvironmentSafe ? "SAFE [GREEN]" : "ALERT [RED]";
+    const char* sDarkText = state.isRoomDark ? "DARK" : "BRIGHT";
 
-    // Extra status note for white lamp shutoff/activation
-    const char* sLampReason = "";
-    if (state.isWhiteLampOn) {
-        if (!state.isNight && state.isDayTooDark) sLampReason = "(Day Dark Comp.)";
-        else if (state.isNight) sLampReason = "(Night Auto)";
-        else sLampReason = "(Manual)";
-    } else {
-        if (!state.isNight && state.isDayTooBright) sLampReason = "(Day Overbright OFF)";
-        else if (state.isNight && state.isNightTooBright) sLampReason = "(Night Bright OFF)";
-    }
-
-    Serial.printf("[ROOM %s | %-4s] Temp: %5s C | Hum: %5s %% | Lux: %4s lx (%-5s) | Comfort: %-13s | Lamp: %-3s %s\r\n",
-                  state.getTimeString().c_str(),
+    Serial.printf("[ROOM | %-4s] Temp: %5s C | Hum: %5s %% | Light: %3d%% (Set:%3d%% - %-6s) | PIR: %-3s | State: %-12s | Lamp: %-3s\r\n",
                   state.getModeName(),
                   sTemp.c_str(),
                   sHum.c_str(),
-                  sLux.c_str(),
-                  sPeriod,
-                  sComfort,
-                  state.isWhiteLampOn ? "ON" : "OFF",
-                  sLampReason);
+                  static_cast<int>(state.lightPercent),
+                  static_cast<int>(state.thresholdPercent),
+                  sDarkText,
+                  state.isMotionDetected ? "YES" : "NO",
+                  sEnvState,
+                  state.isWhiteLampOn ? "ON" : "OFF");
 }

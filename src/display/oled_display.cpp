@@ -26,26 +26,29 @@ void OledDisplay::update(const RoomState& state) {
     // 7x14 font: clear, modern and balanced on 128x64 display
     _oled.setFont(u8g2_font_7x14_tf);
 
-    // Line 1: Temperature
-    String sTemp = "TEMP  : " + formatValue(state.temperature) + " C";
+    // Line 1: Temperature from DHT22
+    String sTemp = "TEMP : " + formatValue(state.temperature) + " C";
     _oled.drawStr(2, 14, sTemp.c_str());
 
-    // Line 2: Humidity
-    String sHum = "HUM   : " + formatValue(state.humidity) + " %";
+    // Line 2: Humidity from DHT22
+    String sHum = "HUM  : " + formatValue(state.humidity) + " %";
     _oled.drawStr(2, 30, sHum.c_str());
 
-    // Line 3: Ambient Light
-    String sLux = "LUX   : " + formatValue(state.lightLux, 0) + " lx";
-    _oled.drawStr(2, 46, sLux.c_str());
+    // Line 3: LDR light intensity vs Potentiometer threshold
+    String sLight = "LDR  : " + String(state.isRoomDark ? "DARK" : "BRIGHT") + 
+                    " (" + String(static_cast<int>(state.thresholdPercent)) + "%)";
+    _oled.drawStr(2, 46, sLight.c_str());
 
-    // Line 4: Real-time Clock from RTC DS1307
-    String sTime;
-    if (state.isRtcReady) {
-        sTime = "TIME  : " + state.getTimeString();
+    // Line 4: System safety state and White Room Lamp status
+    String sState;
+    if (!state.isDataReady) {
+        sState = "STATE: INIT...";
     } else {
-        sTime = "TIME  : NO RTC";
+        const char* safeStr = state.isEnvironmentSafe ? "SAFE" : "ALERT";
+        const char* lampStr = state.isWhiteLampOn ? "ON" : "OFF";
+        sState = String("STATE:") + safeStr + " | L:" + lampStr;
     }
-    _oled.drawStr(2, 62, sTime.c_str());
+    _oled.drawStr(2, 62, sState.c_str());
 
     _oled.sendBuffer();
 }

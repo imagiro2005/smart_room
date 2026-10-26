@@ -8,5 +8,4 @@ public:
     void init();
     void update(RoomState& state);
     bool processSerial(RoomState& state);
-    void handleButtonPress(RoomState& state);
 };
